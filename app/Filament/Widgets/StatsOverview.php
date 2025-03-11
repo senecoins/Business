@@ -1,6 +1,7 @@
 <?php
 namespace App\Filament\Widgets;
 use App\Models\Product;
+use App\Models\Purchase;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
@@ -53,17 +54,22 @@ class StatsOverview extends BaseWidget
         $revenuePercentage = $previousRevenue > 0
             ? round((($currentRevenue - $previousRevenue) / $previousRevenue) * 100, 2)
             : ($currentRevenue > 0 ? 100 : 0);
-        // 2. Calculer le capital (valeur totale de l'inventaire des produits)
-        $capital = Product::selectRaw('SUM(purchase_price * quantity) as total_capital')
+
+        // 2. Calculer le capital (valeur totale des achats) à partir de la table Purchase
+        // Calcul du capital total basé sur tous les achats
+        $capital = Purchase::selectRaw('SUM(purchase_price * quantity) as total_capital')
             ->value('total_capital') ?? 0;
+
         // Obtenir le capital de la période précédente
-        $previousCapital = Product::where('updated_at', '<', $currentStart)
+        $previousCapital = Purchase::where('created_at', '<', $currentStart)
             ->selectRaw('SUM(purchase_price * quantity) as total_capital')
             ->value('total_capital') ?? 0;
+
         // Éviter la division par zéro
         $capitalPercentage = $previousCapital > 0
             ? round((($capital - $previousCapital) / $previousCapital) * 100, 2)
             : ($capital > 0 ? 100 : 0);
+
         // 3. Calculer le profit (revenu - coût des marchandises vendues)
         $costOfGoodsQuery = SaleItem::whereHas('sale', function (Builder $query) {
             $query->where('payment_status', 'paid');
@@ -97,12 +103,10 @@ class StatsOverview extends BaseWidget
         ];
         // Obtenir des libellés descriptifs pour les périodes
         $currentPeriodLabel = $this->getPeriodLabel($startDate, $endDate);
-
         // Fonction pour formater les montants avec FCFA
         $formatMoney = function ($amount) {
             return number_format($amount, 0, ',', ' ') . ' FCFA';
         };
-
         return [
             Stat::make('Chiffre d\'affaires', $formatMoney($totalRevenue))
                 ->description($currentPeriodLabel . ($revenuePercentage >= 0 ? ' +' . $revenuePercentage . '%' : ' -' . abs($revenuePercentage) . '%'))
@@ -110,7 +114,7 @@ class StatsOverview extends BaseWidget
                 ->color($revenuePercentage >= 0 ? Color::Green : Color::Rose)
                 ->chart($chartData)
                 ->icon('heroicon-o-banknotes'),
-            Stat::make('Capital', $formatMoney($capital))
+            Stat::make('Dépenses', $formatMoney($capital))
                 ->description($currentPeriodLabel . ($capitalPercentage >= 0 ? ' +' . $capitalPercentage . '%' : ' -' . abs($capitalPercentage) . '%'))
                 ->descriptionIcon($capitalPercentage >= 0 ? 'heroicon-m-arrow-trending-up' : 'heroicon-m-arrow-trending-down')
                 ->color($capitalPercentage >= 0 ? Color::Green : Color::Rose)
