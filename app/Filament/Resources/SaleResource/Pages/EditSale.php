@@ -18,37 +18,37 @@ class EditSale extends EditRecord
         return [
             Actions\DeleteAction::make()
                 ->before(function () {
-                    // Restaurer le stock avant de supprimer la vente
-                    $this->restoreStock($this->record);
+                    // Restaurer le quantity avant de supprimer la vente
+                    $this->restorequantity($this->record);
                 }),
         ];
     }
 
-    // Ajoutez cette méthode pour restaurer le stock lors de la suppression
-    protected function restoreStock(Model $sale): void
+    // Ajoutez cette méthode pour restaurer le quantity lors de la suppression
+    protected function restorequantity(Model $sale): void
     {
-        // Restaurer le stock pour chaque article de la vente
+        // Restaurer le quantity pour chaque article de la vente
         foreach ($sale->items as $item) {
             $product = Product::find($item->product_id);
             if ($product) {
-                $product->stock += $item->quantity;
+                $product->quantity += $item->quantity;
                 $product->save();
             }
         }
     }
 
-    // Ajoutez cette méthode pour gérer le stock après la sauvegarde
+    // Ajoutez cette méthode pour gérer le quantity après la sauvegarde
     protected function afterSave(): void
     {
         // Récupérer les données originales avant la mise à jour
         $originalItems = $this->record->getOriginal('items') ?? new Collection();
 
-        // Traiter les modifications de stock
-        $this->handleStockChanges($originalItems, $this->record->items);
+        // Traiter les modifications de quantity
+        $this->handlequantityChanges($originalItems, $this->record->items);
     }
 
-    // Ajoutez cette méthode pour gérer les changements de stock
-    protected function handleStockChanges(Collection $originalItems, Collection $newItems): void
+    // Ajoutez cette méthode pour gérer les changements de quantity
+    protected function handlequantityChanges(Collection $originalItems, Collection $newItems): void
     {
         // Créer un tableau associatif pour faciliter la comparaison
         $originalItemsMap = [];
@@ -65,22 +65,22 @@ class EditSale extends EditRecord
             if (isset($originalItemsMap[$newItem->id])) {
                 $originalItem = $originalItemsMap[$newItem->id];
 
-                // Si le produit a changé, restaurer le stock du produit original
+                // Si le produit a changé, restaurer le quantity du produit original
                 if ($originalItem->product_id != $newItem->product_id) {
                     $originalProduct = Product::find($originalItem->product_id);
                     if ($originalProduct) {
-                        $originalProduct->stock += $originalItem->quantity;
+                        $originalProduct->quantity += $originalItem->quantity;
                         $originalProduct->save();
 
-                        // Déduire le stock du nouveau produit
-                        $product->stock -= $newItem->quantity;
+                        // Déduire le quantity du nouveau produit
+                        $product->quantity -= $newItem->quantity;
                         $product->save();
                     }
                 } else {
                     // Même produit, mais quantité différente
                     $quantityDiff = $newItem->quantity - $originalItem->quantity;
                     if ($quantityDiff != 0) {
-                        $product->stock -= $quantityDiff;
+                        $product->quantity -= $quantityDiff;
                         $product->save();
                     }
                 }
@@ -88,13 +88,13 @@ class EditSale extends EditRecord
                 // Supprimer l'élément traité
                 unset($originalItemsMap[$newItem->id]);
             } else {
-                // Nouvel élément, déduire le stock
-                $product->stock -= $newItem->quantity;
+                // Nouvel élément, déduire le quantity
+                $product->quantity -= $newItem->quantity;
                 $product->save();
             }
         }
 
-        // Pour les éléments qui ont été supprimés, restaurer le stock
+        // Pour les éléments qui ont été supprimés, restaurer le quantity
         foreach ($originalItemsMap as $originalItem) {
             $product = Product::find($originalItem->product_id);
             if ($product) {
