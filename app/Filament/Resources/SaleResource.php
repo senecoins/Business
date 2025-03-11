@@ -16,7 +16,7 @@ class SaleResource extends Resource
 {
     protected static ?string $model = Sale::class;
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
-    
+
     public static function form(Form $form): Form
     {
         return $form->schema([
@@ -30,7 +30,7 @@ class SaleResource extends Resource
         ])
             ->columns(4);
     }
-    
+
     protected static function saleDetailsSection(): Forms\Components\Section
     {
         return Forms\Components\Section::make('Sale Details')
@@ -59,7 +59,7 @@ class SaleResource extends Resource
                     ->inline(),
             ]);
     }
-    
+
     protected static function customerForm(): array
     {
         return [
@@ -75,7 +75,7 @@ class SaleResource extends Resource
                 ->maxLength(255),
         ];
     }
-    
+
     protected static function saleItemsSection(): Forms\Components\Section
     {
         return Forms\Components\Section::make('Sale Items')
@@ -95,7 +95,7 @@ class SaleResource extends Resource
                     ->deleteAction(fn(Action $action) => $action->after(fn(Get $get, Set $set) => self::calculateTotalAmount($get, $set))),
             ]);
     }
-    
+
     protected static function saleItemSchema(): array
     {
         return [
@@ -116,18 +116,20 @@ class SaleResource extends Resource
                 ->afterStateUpdated(self::handleQuantityUpdate())
                 ->validationAttribute('quantity')
                 ->rules([
-                    fn (Get $get): \Closure => function (string $attribute, $value, \Closure $fail) use ($get) {
-                        $productId = $get('product_id');
-                        if (!$productId) return;
+                    function (Get $get): \Closure {
+                        return function (string $attribute, $value, \Closure $fail) use ($get) {
+                            $productId = $get('product_id');
+                            if (!$productId) return;
 
-                        $product = Product::find($productId);
-                        if (!$product) return;
+                            $product = Product::find($productId);
+                            if (!$product) return;
 
-                        if ($value > $product->quantity) {
-                             $fail("Insufficient stock. Only {$product->stock} units available.");
+                            if ($value > $product->quantity) {
+                                $fail("Stock insuffisant. Seulement {$product->quantity} unités disponibles.");
+                            }
+                        };
                     }
-                },
-            ]),
+                ]),
             Forms\Components\TextInput::make('unit_price')
                 ->label('Unit Price')
                 ->numeric()
@@ -150,7 +152,7 @@ class SaleResource extends Resource
                 ->dehydrated(),
         ];
     }
-    
+
     protected static function handleProductUpdate(): callable
     {
         return function (Get $get, Set $set, ?string $state) {
@@ -166,7 +168,7 @@ class SaleResource extends Resource
             }
         };
     }
-    
+
     protected static function handleQuantityUpdate(): callable
     {
         return function (Get $get, Set $set, $state) {
@@ -178,7 +180,7 @@ class SaleResource extends Resource
             }
         };
     }
-    
+
     protected static function handleUnitPriceUpdate(): callable
     {
         return function (Get $get, Set $set, $state) {
@@ -188,7 +190,7 @@ class SaleResource extends Resource
             self::calculateTotalAmount($get, $set);
         };
     }
-    
+
     protected static function handleDiscountUpdate(): callable
     {
         return function (Get $get, Set $set, $state) {
@@ -200,7 +202,7 @@ class SaleResource extends Resource
             }
         };
     }
-    
+
     protected static function notesSection(): Forms\Components\Section
     {
         return Forms\Components\Section::make('Notes')
@@ -210,42 +212,42 @@ class SaleResource extends Resource
             ])
             ->columnSpan('full');
     }
-    
+
     private static function calculateFinalPrice(Set $set, float $unitPrice, int $quantity, float $discountValue): void
     {
         $subtotal = $unitPrice * $quantity;
         $finalPrice = max(0, $subtotal - $discountValue);
         $set('final_price', $finalPrice); // Pas d'arrondi pour le FCFA
     }
-    
+
     private static function calculateTotalAmount(Get $get, Set $set): void
     {
         $items = $get('items');
         $totalAmount = 0;
-        
+
         if (is_array($items)) {
             foreach ($items as $itemKey => $item) {
                 if (isset($item['unit_price']) && isset($item['quantity'])) {
                     $unitPrice = (float)$item['unit_price'];
                     $quantity = (int)$item['quantity'];
                     $discountValue = (float)($item['discount_value'] ?? 0);
-                    
+
                     $subtotal = $unitPrice * $quantity;
                     $finalPrice = max(0, $subtotal - $discountValue);
-                    
+
                     // Mise à jour du prix final dans l'élément
                     $set("items.{$itemKey}.final_price", $finalPrice);
-                    
+
                     $totalAmount += $finalPrice;
                 } elseif (isset($item['final_price'])) {
                     $totalAmount += (float)$item['final_price'];
                 }
             }
         }
-        
+
         $set('total_amount', $totalAmount);
     }
-    
+
     public static function table(Table $table): Table
     {
         return $table
@@ -267,12 +269,12 @@ class SaleResource extends Resource
                 ]),
             ]);
     }
-    
+
     public static function getRelations(): array
     {
         return [];
     }
-    
+
     public static function getPages(): array
     {
         return [
